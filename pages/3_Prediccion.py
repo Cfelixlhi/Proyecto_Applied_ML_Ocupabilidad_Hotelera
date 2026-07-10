@@ -1,6 +1,12 @@
 import streamlit as st
-import pandas as pd
+
+st.write("Inicio correcto")
+
 import joblib
+st.write("Joblib importado correctamente")
+
+import pandas as pd
+st.write("Pandas importado correctamente")
 
 # ==========================================================
 # Configuración
