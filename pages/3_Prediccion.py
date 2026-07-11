@@ -16,7 +16,7 @@ st.title("🔮 Predicción de Ocupabilidad Hotelera")
 st.markdown("""
 Seleccione un **departamento**, **año** y **mes** para visualizar la
 predicción de la tasa de ocupabilidad hotelera generada por el modelo
-Random Forest para el periodo **2025–2030**.
+Random Forest para el periodo **2025–2027**.
 """)
 
 # ==========================================================
@@ -112,7 +112,7 @@ del año **{anio}** será aproximadamente de **{pred:.2f}%**.
 
 Esta predicción fue obtenida utilizando el modelo entrenado con
 información histórica del periodo **2019–2024**, proyectando el
-comportamiento esperado para los años **2025–2030**.
+comportamiento esperado para los años **2025–2027**.
 """)
 
         st.divider()
@@ -143,5 +143,5 @@ comportamiento esperado para los años **2025–2030**.
         st.divider()
 
         st.caption(
-            "Las predicciones corresponden a escenarios futuros (2025–2030) generados mediante el modelo Random Forest entrenado con datos históricos de MINCETUR."
+            "Las predicciones corresponden a escenarios futuros (2025–2027) generados mediante el modelo Random Forest entrenado con datos históricos de MINCETUR."
         )
