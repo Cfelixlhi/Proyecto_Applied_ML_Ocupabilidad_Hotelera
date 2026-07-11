@@ -1,5 +1,5 @@
 # ==========================================================
-# GENERAR PREDICCIONES 2025-2030
+# GENERADOR DE PREDICCIONES 2025-2030
 # Proyecto Applied Machine Learning
 # ==========================================================
 
@@ -8,9 +8,9 @@ import numpy as np
 import joblib
 from pathlib import Path
 
-print("=" * 60)
-print("GENERADOR DE PREDICCIONES 2025-2030")
-print("=" * 60)
+print("=" * 70)
+print("GENERADOR DE PREDICCIONES FUTURAS")
+print("=" * 70)
 
 # ==========================================================
 # Rutas
@@ -44,22 +44,16 @@ modelo = joblib.load(MODELO_PATH)
 
 print("Modelo cargado correctamente")
 
-# ==========================================================
-# Información del modelo
-# ==========================================================
+columnas_modelo = list(modelo.feature_names_in_)
 
 print("\nVariables utilizadas por el modelo:\n")
-
-columnas_modelo = list(modelo.feature_names_in_)
 
 for c in columnas_modelo:
     print("-", c)
 
 # ==========================================================
-# Obtener último registro de cada departamento
+# Obtener último registro por departamento
 # ==========================================================
-
-print("\nBuscando último registro disponible por departamento...")
 
 df = df.sort_values(
     ["DEPARTAMENTO", "ANIO", "MES"]
@@ -74,25 +68,6 @@ ultimos = (
 
 print(f"\nDepartamentos encontrados: {len(ultimos)}")
 
-print("\nPrimeros registros:")
-
-print(
-    ultimos[
-        [
-            "DEPARTAMENTO",
-            "ANIO",
-            "MES",
-            "TASA_OCUPABILIDAD_HOTELERA"
-        ]
-    ].head()
-)
-
-# ==========================================================
-# Variables base
-# ==========================================================
-
-print("\nPreparando variables base...")
-
 registros_futuros = []
 
 # ==========================================================
@@ -103,31 +78,65 @@ def crear_registro_futuro(registro, anio, mes):
 
     nuevo = registro.copy()
 
-    # Fecha
+    # ------------------------------------------------------
+    # Variables temporales
+    # ------------------------------------------------------
+
     nuevo["ANIO"] = anio
     nuevo["MES"] = mes
 
-    # Variables cíclicas
     nuevo["MES_SIN"] = np.sin(2 * np.pi * mes / 12)
     nuevo["MES_COS"] = np.cos(2 * np.pi * mes / 12)
 
-    # Tendencia temporal
+    nuevo["ES_COVID_2020"] = 0
     nuevo["TENDENCIA_MESES"] += 1
 
-    # Después de 2020 ya no existe COVID
-    nuevo["ES_COVID_2020"] = 0
+    # ------------------------------------------------------
+    # Años transcurridos desde el último dato (2024)
+    # ------------------------------------------------------
+
+    incremento = anio - 2024
+
+    # ------------------------------------------------------
+    # Crecimiento proyectado
+    # ------------------------------------------------------
+
+    nuevo["NUMERO_ESTABLECIMIENTOS"] *= (1.008 ** incremento)
+
+    nuevo["NUMERO_HABITACIONES"] *= (1.010 ** incremento)
+
+    nuevo["NUMERO_PLAZAS_CAMA"] *= (1.010 ** incremento)
+
+    nuevo["TOTAL_ARRIBOS"] *= (1.030 ** incremento)
+
+    nuevo["TOTAL_PERNOCT"] *= (1.028 ** incremento)
+
+    nuevo["TOTAL_EMPLEO"] *= (1.015 ** incremento)
+
+    nuevo["PROMEDIO_PERMANENCIA"] *= (1.002 ** incremento)
+
+    # ------------------------------------------------------
+    # También actualizar los lags de variables auxiliares
+    # ------------------------------------------------------
+
+    nuevo["ARRIBOS_LAG_1"] = nuevo["TOTAL_ARRIBOS"]
+
+    nuevo["PERNOCT_LAG_1"] = nuevo["TOTAL_PERNOCT"]
+
+    nuevo["EMPLEO_LAG_1"] = nuevo["TOTAL_EMPLEO"]
 
     return nuevo
 
+
 # ==========================================================
-# Función para actualizar los lags
+# Función para actualizar los lags de ocupabilidad
 # ==========================================================
 
-def actualizar_lags(registro, prediccion):
+def actualizar_lags(registro, pred):
 
     registro["TASA_LAG_3"] = registro["TASA_LAG_2"]
     registro["TASA_LAG_2"] = registro["TASA_LAG_1"]
-    registro["TASA_LAG_1"] = prediccion
+    registro["TASA_LAG_1"] = pred
 
     registro["TASA_MEDIA_MOVIL_3"] = (
         registro["TASA_LAG_1"] +
@@ -137,35 +146,12 @@ def actualizar_lags(registro, prediccion):
 
     return registro
 
-# ==========================================================
-# Verificación
-# ==========================================================
 
-ejemplo = ultimos.iloc[0].copy()
-
-nuevo = crear_registro_futuro(
-    ejemplo,
-    2025,
-    1
-)
-
-print("\nRegistro de prueba")
-
-print(
-    nuevo[
-        [
-            "DEPARTAMENTO",
-            "ANIO",
-            "MES",
-            "MES_SIN",
-            "MES_COS",
-            "TENDENCIA_MESES"
-        ]
-    ]
-)
+print("\nFunciones creadas correctamente.")
 
 # ==========================================================
-# GENERAR PREDICCIONES FUTURAS
+# PARTE 3
+# Generar predicciones futuras
 # ==========================================================
 
 print("\nGenerando predicciones...\n")
@@ -178,24 +164,25 @@ for _, fila in ultimos.iterrows():
 
         for mes in range(1, 13):
 
+            # Crear registro futuro
             futuro = crear_registro_futuro(
                 estado,
                 anio,
                 mes
             )
 
-            # Variables que espera el modelo
+            # Variables que espera el Pipeline
             X = futuro[columnas_modelo].to_frame().T
 
             # Predicción
             pred = modelo.predict(X)[0]
 
-            # Guardar la predicción
+            # Guardar predicción
             futuro["TASA_OCUPABILIDAD_HOTELERA"] = pred
 
             registros_futuros.append(futuro.copy())
 
-            # Actualizar estado para el siguiente mes
+            # Actualizar el estado para el siguiente mes
             estado = futuro.copy()
 
             estado = actualizar_lags(
@@ -204,10 +191,11 @@ for _, fila in ultimos.iterrows():
             )
 
 print("Predicciones generadas correctamente.")
+
 print(f"Total de registros: {len(registros_futuros)}")
 
 # ==========================================================
-# CREAR DATAFRAME FINAL
+# Crear DataFrame
 # ==========================================================
 
 predicciones = pd.DataFrame(registros_futuros)
@@ -226,16 +214,68 @@ print(
 )
 
 # ==========================================================
-# GUARDAR CSV
+# PARTE 4
+# Guardar predicciones
 # ==========================================================
 
+print("\n" + "=" * 70)
+print("GUARDANDO PREDICCIONES")
+print("=" * 70)
+
+predicciones = predicciones.sort_values(
+    ["DEPARTAMENTO", "ANIO", "MES"]
+).reset_index(drop=True)
+
 predicciones.to_csv(
-    "data/predicciones_2025_2030.csv",
-    index=False
+    SALIDA_PATH,
+    index=False,
+    encoding="utf-8-sig"
 )
 
-print("\n==========================================")
-print("Archivo guardado correctamente.")
-print("Ruta:")
-print("data/predicciones_2025_2030.csv")
-print("==========================================")
+print("\nArchivo generado correctamente.")
+
+print(f"Ruta: {SALIDA_PATH}")
+
+print(f"Total de registros: {len(predicciones):,}")
+
+print("\nAños generados:")
+
+print(
+    sorted(
+        predicciones["ANIO"].unique()
+    )
+)
+
+print("\nDepartamentos:")
+
+print(
+    predicciones["DEPARTAMENTO"].nunique()
+)
+
+print("\nPrimeras filas:\n")
+
+print(
+    predicciones[
+        [
+            "DEPARTAMENTO",
+            "ANIO",
+            "MES",
+            "TASA_OCUPABILIDAD_HOTELERA"
+        ]
+    ].head(15)
+)
+
+print("\nÚltimas filas:\n")
+
+print(
+    predicciones[
+        [
+            "DEPARTAMENTO",
+            "ANIO",
+            "MES",
+            "TASA_OCUPABILIDAD_HOTELERA"
+        ]
+    ].tail(15)
+)
+
+print("\nProceso finalizado correctamente.")
