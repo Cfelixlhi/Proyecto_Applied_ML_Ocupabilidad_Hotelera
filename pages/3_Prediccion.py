@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import joblib
 
 # ==========================================================
 # Configuración
@@ -15,30 +14,24 @@ st.set_page_config(
 st.title("🔮 Predicción de Ocupabilidad Hotelera")
 
 st.markdown("""
-Seleccione un **departamento**, **año** y **mes** para estimar la tasa de
-ocupabilidad hotelera utilizando el modelo de Machine Learning entrenado.
+Seleccione un **departamento**, **año** y **mes** para visualizar la
+predicción de la tasa de ocupabilidad hotelera generada por el modelo
+Random Forest para el periodo **2025–2030**.
 """)
 
 # ==========================================================
-# Cargar datos
+# Cargar predicciones
 # ==========================================================
 
 @st.cache_data
-def cargar_dataset():
-    return pd.read_csv("data/dataset_final.csv")
-
-
-@st.cache_resource
-def cargar_modelo():
-    return joblib.load("modelo_ocupabilidad.pkl")
-
+def cargar_predicciones():
+    return pd.read_csv("data/predicciones_2025_2030.csv")
 
 try:
-    df = cargar_dataset()
-    modelo = cargar_modelo()
+    df = cargar_predicciones()
 
 except Exception as e:
-    st.error("❌ No fue posible cargar el modelo o el dataset.")
+    st.error("No fue posible cargar el archivo de predicciones.")
     st.exception(e)
     st.stop()
 
@@ -50,7 +43,7 @@ col1, col2, col3 = st.columns(3)
 
 departamento = col1.selectbox(
     "Departamento",
-    sorted(df["DEPARTAMENTO"].dropna().unique())
+    sorted(df["DEPARTAMENTO"].unique())
 )
 
 anio = col2.selectbox(
@@ -68,109 +61,68 @@ mes = col3.selectbox(
 # ==========================================================
 
 registro = df[
-    (df["DEPARTAMENTO"] == departamento)
-    & (df["ANIO"] == anio)
-    & (df["MES"] == mes)
+    (df["DEPARTAMENTO"] == departamento) &
+    (df["ANIO"] == anio) &
+    (df["MES"] == mes)
 ]
 
 # ==========================================================
-# Predicción
+# Mostrar predicción
 # ==========================================================
 
 if st.button("🔮 Realizar Predicción", use_container_width=True):
 
     if registro.empty:
 
-        st.error("No existe información para la combinación seleccionada.")
+        st.error("No existe una predicción para la combinación seleccionada.")
 
     else:
 
-        fila = registro.iloc[[0]].copy()
+        fila = registro.iloc[0]
 
-        columnas_modelo = list(modelo.feature_names_in_)
+        pred = fila["TASA_OCUPABILIDAD_HOTELERA"]
 
-        X = fila[columnas_modelo]
-
-        pred = modelo.predict(X)[0]
-
-        valor_real = fila["TASA_OCUPABILIDAD_HOTELERA"].iloc[0]
-
-        error = abs(pred - valor_real)
-
-        st.success("✅ Predicción realizada correctamente")
-
-        # ==================================================
-        # Métricas
-        # ==================================================
+        st.success("✅ Predicción generada correctamente")
 
         c1, c2, c3 = st.columns(3)
 
         c1.metric(
-            "Predicción",
-            f"{pred:.2f}%"
+            "Departamento",
+            departamento
         )
 
         c2.metric(
-            "Valor real",
-            f"{valor_real:.2f}%"
+            "Periodo",
+            f"{mes}/{anio}"
         )
 
         c3.metric(
-            "Error absoluto",
-            f"{error:.2f} pp"
+            "Ocupabilidad estimada",
+            f"{pred:.2f}%"
         )
 
         st.divider()
-
-        # ==================================================
-        # Interpretación
-        # ==================================================
 
         st.subheader("📌 Interpretación")
 
-        if error <= 1:
+        st.info(f"""
+El modelo **Random Forest** estima que la tasa de ocupabilidad hotelera
+para el departamento de **{departamento}** durante el mes **{mes}**
+del año **{anio}** será aproximadamente de **{pred:.2f}%**.
 
-            st.success(
-                "La predicción presenta una excelente precisión, con una diferencia menor a un punto porcentual respecto al valor observado."
-            )
-
-        elif error <= 3:
-
-            st.warning(
-                "La predicción presenta una buena aproximación al valor real, aunque existe una diferencia moderada."
-            )
-
-        else:
-
-            st.error(
-                "La diferencia entre el valor predicho y el observado es considerable."
-            )
-
-        st.info(
-            f"""
-El modelo Random Forest estima una tasa de ocupabilidad hotelera de
-**{pred:.2f}%** para el departamento de **{departamento}**
-durante el mes **{mes}** del año **{anio}**.
-
-El valor histórico registrado para ese periodo fue de
-**{valor_real:.2f}%**, obteniéndose un error absoluto de
-**{error:.2f} puntos porcentuales**.
-"""
-        )
+Esta predicción fue obtenida utilizando el modelo entrenado con
+información histórica del periodo **2019–2024**, proyectando el
+comportamiento esperado para los años **2025–2030**.
+""")
 
         st.divider()
 
-        # ==================================================
-        # Registro utilizado
-        # ==================================================
-
-        st.subheader("📄 Registro utilizado")
+        st.subheader("📄 Información utilizada")
 
         columnas = [
             "DEPARTAMENTO",
             "ANIO",
             "MES",
-            "TASA_OCUPABILIDAD_HOTELERA",
             "NUMERO_ESTABLECIMIENTOS",
             "NUMERO_HABITACIONES",
             "NUMERO_PLAZAS_CAMA",
@@ -180,10 +132,16 @@ El valor histórico registrado para ese periodo fue de
             "TOTAL_EMPLEO"
         ]
 
-        columnas_existentes = [c for c in columnas if c in fila.columns]
+        columnas = [c for c in columnas if c in df.columns]
 
         st.dataframe(
-            fila[columnas_existentes],
+            registro[columnas],
             use_container_width=True,
             hide_index=True
+        )
+
+        st.divider()
+
+        st.caption(
+            "Las predicciones corresponden a escenarios futuros (2025–2030) generados mediante el modelo Random Forest entrenado con datos históricos de MINCETUR."
         )
